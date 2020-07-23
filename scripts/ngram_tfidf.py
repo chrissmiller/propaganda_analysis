@@ -8,14 +8,20 @@ import string
 import operator
 from collections import defaultdict
 import pickle
+from nltk.corpus import stopwords
 
 # n-gram lengths to iterate through
 min_N = 1       # inclusive
-max_N = 6      # exclusive
+max_N = 5    # exclusive
 
-fold = 'train'
-label_sentence_map = pickle.load(open('objects/label_text_map_' + fold + '.pkl', 'rb'))
-labels = sorted(list(label_sentence_map.keys()))
+folds = ['train', 'dev']
+label_sentence_map = {}
+stopwords_set = set(stopwords.words('english'))
+for fold in folds:
+    label_sentence_map[fold] = pickle.load(open('objects/generic_label_sentence_map_' + fold + '.pkl', 'rb'))
+
+labels = sorted(list(label_sentence_map[folds[0]].keys()))
+
 
 
 ####
@@ -69,20 +75,24 @@ def overlap(a, b):
 # returns a list of corpora
 def get_corpus_list(sample=1000):
     docs = []
-    translator = str.maketrans('', '', string.punctuation)
 
     for label in labels:
-        if sample and len(label_sentence_map[label]) > sample:
-            label_sentence_map[label] = random.sample(label_sentence_map[label], sample)
-
         to_append = []
+        append_final = []
+        for fold in folds:
+            if sample and len(label_sentence_map[fold][label]) > sample:
+                label_sentence_map[fold][label] = random.sample(label_sentence_map[fold][label], sample)
 
-        for sent in label_sentence_map[label]:
-            split_sent = sent.translate(translator).strip().split()
-            to_append += split_sent
-            to_append += ["<BR>"]
+            for sent in label_sentence_map[fold][label]:
+                split_sent = sent.strip().lower().split()
+                to_append += [' '.join([''.join([c for c in word if c.isalnum()]) for word in split_sent])] # if word not in stopwords_set]
+            to_append = list(set(to_append))
 
-        docs.append(to_append)
+            for sent in to_append:
+                append_final += sent.strip().split()
+                append_final += ["<BR>"]
+
+        docs.append(append_final)
 
     return docs
 
@@ -128,7 +138,7 @@ def tfidf_dicts_from_freq_dicts(freq_dicts):
             tfidf_dicts[label][ngram] = tf * idf * len(ngram)
 
             # kill anything ending in "and" "or" "of" "with"
-            if ngram[-1] in ["and", "or", "of", "with", "were", "are", "is", "for", "be", "a", "this", "by", "to", "the"]:
+            if ngram[-1] in ["and", "or", "of", "with"]:#, "were", "are", "is", "for", "be", "a", "this", "by", "to", "the"]:
                 tfidf_dicts[label][ngram] = 0
 
     return tfidf_dicts
@@ -160,21 +170,29 @@ def prune_substrings(tfidf_dicts, prune_thru=1000):
 
 # sorts the n-grams for a label by tf-idf
 def top_ngrams_for_label(tfidf_dicts, label, count=20):
-    return sorted(tfidf_dicts[label].items(), key=operator.itemgetter(1), reverse=True)[:count]
+    return sorted([item for item in tfidf_dicts[label].items() if len(item[0]) >= 3], key=operator.itemgetter(1), reverse=True)[:count]
 
 
 def main():
     corpus_list = get_corpus_list()
     freq_dicts = freq_dicts_from_corpus_list(corpus_list)
 
+    # for label in range(len(labels)):
+    #     print(labels[label])
+    #     for ngram in top_ngrams_for_label(freq_dicts, label, 20):
+    #         print("\t" + ' '.join(ngram[0]) + ' (' + str(freq_dicts[label][ngram[0]]) + ')')
+    #
+    # return
     tfidf_dicts = tfidf_dicts_from_freq_dicts(freq_dicts)
     tfidf_dicts = prune_substrings(tfidf_dicts)
+
+
 
     # print the top ngrams sorted by tfidf
     for label in range(len(labels)):
         print(labels[label])
         for ngram in top_ngrams_for_label(tfidf_dicts, label, 20):
-            print("\t" + ' '.join(ngram[0]))
+            print("\t" + ' '.join(ngram[0]) + ' (' + str(freq_dicts[label][ngram[0]]) + ')')
 
 
 

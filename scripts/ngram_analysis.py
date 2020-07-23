@@ -7,22 +7,25 @@ from nltk.corpus import stopwords
 from nltk.metrics import BigramAssocMeasures, TrigramAssocMeasures
 from nltk.collocations import BigramCollocationFinder, TrigramCollocationFinder
 
-fold = 'train'
-label_sentence_map = pickle.load(open('objects/label_text_map_' + fold + '.pkl', 'rb'))
+folds = ['train', 'dev']
+label_sentence_map = {}
+
+for fold in folds:
+    label_sentence_map[fold] = pickle.load(open('objects/label_text_map_' + fold + '.pkl', 'rb'))
 
 docs = []
-labels = sorted(list(label_sentence_map.keys()))
+labels = sorted(list(label_sentence_map['train'].keys()))
 print(f"Labels: {labels}")
-translator = str.maketrans('', '', string.punctuation)
 stopwords_set = set(stopwords.words('english'))
 num_best_collocations = 10
 
 for label in labels:
     cleaned = []
-    for sent in label_sentence_map[label]:
-        words = sent.translate(translator).strip().split()
-        cleaned += [word for word in words if word not in stopwords_set]
-        cleaned += ["<BR>"]
+    for fold in folds:
+        for sent in label_sentence_map[fold][label]:
+            words = sent.strip().lower().split()
+            cleaned += [''.join([c for c in word if c.isalnum()]) for word in words if word not in stopwords_set]
+            cleaned += ["<BR>"]
     docs.append(cleaned)
 
     ngram_collocation = BigramCollocationFinder.from_words(docs[-1])
