@@ -15,17 +15,14 @@ files = glob.glob(data_dir + fold + 'article*.txt')
 
 label_sentence_map = defaultdict(list)
 
-for article in files:
+for i,article in enumerate(files):
+    if (i+1)%25 == 0: print(f"{i+1}/{len(files)}...")
     articleID = article.split('/')[-1][7:-4] # parse article ID number
 
     with open(data_dir + fold + 'article' + articleID + '.txt') as f:
         article_text = f.read()
     label_table = pd.read_table(data_dir + fold + 'article' + articleID + '.labels.tsv', names=["DocID", "Label", "Start", "End"])
     processed = nlp(article_text)
-    print("Article Text:\n")
-    print(article_text)
-    print("\nExpected labels: ")
-    print(label_table)
 
     for sent in processed.sents:
         start, end = sent.start_char, sent.end_char
@@ -35,20 +32,4 @@ for article in files:
         for label in sent_labels.Label.unique():
             label_sentence_map[label].append(sent.text)
 
-        '''
-        if len(sent_labels) > 0:
-            print(f"Sentence: {sent}")
-            print(f"Labels: {sent_labels.Label.unique()}")
-
-            for _,row in sent_labels.iterrows():
-                print(f"\tSublabel:{row.Label}")
-                print(f"\tText:{article_text[row.Start:row.End]}")
-            print("\n\n")
-        '''
-'''
-    for _,row in label_table.iterrows():
-        print(row.Label)
-        print("\t" + article_text[row.Start:row.End])
-        print("\n")
-'''
-# might need to convert to sentence level labels ?
+pickle.dump(label_sentence_map, open('objects/label_sentence_map_train.pkl', 'wb'))
